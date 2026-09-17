@@ -49,3 +49,12 @@ native/system/test/bin/
 .projectmem/watch.pid
 .projectmem/watch.log
 .projectmem/structure.json
+
+# DSH 运行时数据（issue #0003 遗物：DSH 曾从仓库根启动，把 home 落进 checkout）
+sessions/
+storages/
+profiles/
+settings.yaml
+.dsh/
+.projectmem/
+弹出独立应用窗口
