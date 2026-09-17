@@ -225,12 +225,17 @@ function serializeAssistant(message: Message): WireMessage {
     // the message sits durably in the session log, a null here bricks every
     // later turn of that session.
     content: text,
-    // CoT passback on every reasoning-carrying turn. The official rule
-    // (guides/thinking_mode.mdx) requires it on tool-call turns and ignores it
-    // elsewhere; a gateway re-encoding the conversation for another vendor
-    // recovers that turn's upstream thinking signature by hashing this exact
-    // text, which a tool-call-free turn carries nowhere else.
-    ...reasoning.length > 0 ? { reasoning_content: reasoning } : {},
+    // CoT passback on TOOL-CALL turns and PURE-THINKING turns only
+    // (2026-08-26, Ember 拍板). The official rule (guides/thinking_mode.mdx)
+    // REQUIRES it on tool-call turns (400 without it) and IGNORES it
+    // elsewhere; a reasoning-only turn keeps it because an assistant message
+    // with empty text and no reasoning may itself be rejected. Normal text
+    // turns drop it — re-sending reasoning the model never reads paid input
+    // tokens and context window every turn (ox 实测：不回传时上下文增长
+    // 显著变慢). Recovering an upstream thinking signature for a gateway
+    // re-encoding was the only reason for full passback; restore it by
+    // changing the condition back to `reasoning.length > 0`.
+    ...reasoning.length > 0 && (toolCalls.length > 0 || text === '') ? { reasoning_content: reasoning } : {},
     ...toolCalls.length > 0 ? { tool_calls: toolCalls } : {},
   }
 }

@@ -81,11 +81,26 @@ export function estimateSystemMessage(message: Message): number {
  * Heuristically price one model-visible message.
  * @param message - message to price without mutation.
  * @returns content and role-framing tokens under the fixed heuristic; a
- *   system-role message prices as {@link estimateSystemMessage}.
+ *   system-role message prices as {@link estimateSystemMessage}. Reasoning
+ *   blocks are priced only where the DeepSeek wire keeps them (see below).
  */
 export function estimateMessage(message: Message): number {
   if (message.role === 'system') return estimateSystemMessage(message)
-  return estimateContent(message.content) + ROLE_OVERHEAD
+  // Mirror the DeepSeek wire passback policy (packages/llm/llm-deepseek
+  // serialize.ts, 2026-08-26 拍板): reasoning_content reaches the wire only
+  // on tool-call turns and pure-thinking turns; normal text turns drop it.
+  // Price the same shape so the context meter matches what the provider
+  // actually receives. If the serialize condition changes, mirror it here.
+  const hasToolCall = message.content.some(block => block.type === 'tool-call')
+  const text = message.content
+    .filter(block => block.type === 'text')
+    .map(block => block.text)
+    .join('')
+  const keepsReasoningOnWire = hasToolCall || text === ''
+  const priced = keepsReasoningOnWire
+    ? message.content
+    : message.content.filter(block => block.type !== 'reasoning')
+  return estimateContent(priced) + ROLE_OVERHEAD
 }
 
 /**

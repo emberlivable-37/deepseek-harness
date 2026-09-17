@@ -99,7 +99,7 @@ describe('serializeMessages', () => {
     expect(wire).toEqual([{ role: 'system', content: 'be brief' }])
   })
 
-  it('passes reasoning_content back on tool-call-free turns', () => {
+  it('drops reasoning_content on tool-call-free text turns (2026-08-26 policy)', () => {
     const wire = serializeMessages([
       createMessage({
         role: 'assistant',
@@ -110,10 +110,11 @@ describe('serializeMessages', () => {
         source: { kind: 'plugin', plugin: 'test' },
       }),
     ])
-    // A gateway that re-encodes the conversation for another vendor recovers
-    // the upstream thinking signature by hashing this exact text, and a turn
-    // that called no tool carries it nowhere else.
-    expect(wire).toEqual([{ role: 'assistant', content: 'answer', reasoning_content: 'thinking…' }])
+    // Normal text turns drop reasoning: the model never reads it back, so
+    // re-sending it paid input tokens and context window every turn
+    // (ox 实测：不回传时上下文增长显著变慢). Tool-call turns and
+    // pure-thinking turns still pass it back (see below).
+    expect(wire).toEqual([{ role: 'assistant', content: 'answer' }])
   })
 
   it('passes reasoning_content back on tool-call turns (official passback rule)', () => {
